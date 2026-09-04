@@ -12,12 +12,17 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
     return;
   }
 
-  const { tracer, forceFlush, shutdown } = initTracer(config);
+  const { tracer, provider, exporter, forceFlush, shutdown } = initTracer(config);
   const cm = new TraceContextManager(tracer);
+
+  let currentSessionId: string | undefined;
+  let currentCwd: string | undefined;
 
   pi.on("session_start", async (_event, ctx) => {
     try {
-      cm.startAgentRun(ctx?.sessionId, ctx?.cwd);
+      if (ctx?.sessionId) currentSessionId = ctx.sessionId;
+      if (ctx?.cwd) currentCwd = ctx.cwd;
+      cm.startAgentRun(currentSessionId, currentCwd);
     } catch (err) {
       console.warn("[pi-otel] Error in session_start:", err);
     }
@@ -25,7 +30,9 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
 
   pi.on("agent_start", async (_event, ctx) => {
     try {
-      cm.startAgentRun(ctx?.sessionId, ctx?.cwd);
+      if (ctx?.sessionId) currentSessionId = ctx.sessionId;
+      if (ctx?.cwd) currentCwd = ctx.cwd;
+      cm.startAgentRun(currentSessionId, currentCwd);
     } catch (err) {
       console.warn("[pi-otel] Error in agent_start:", err);
     }
@@ -118,4 +125,6 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
       console.warn("[pi-otel] Error in session_shutdown:", err);
     }
   });
+
+  return { tracer, provider, exporter, forceFlush, shutdown, contextManager: cm };
 }

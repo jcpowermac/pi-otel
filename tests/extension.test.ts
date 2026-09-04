@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import extensionFactory from "../src/index.js";
+import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
+import { GENAI_ATTRS, TOOL_ATTRS, AGENT_ATTRS } from "../src/conventions.js";
 
 class MockExtensionAPI {
   handlers = new Map<string, Function[]>();
@@ -21,9 +23,7 @@ class MockExtensionAPI {
 
 test("extension hooks emit spans through full lifecycle without errors", async () => {
   const pi = new MockExtensionAPI();
-  process.env.PI_OTEL_EXPORTER = "memory";
-
-  extensionFactory(pi as any);
+  const context = extensionFactory(pi as any, { exporter: "memory" });
 
   // Simulate Pi lifecycle
   await pi.emit("session_start", { reason: "startup" }, { sessionId: "s1", cwd: "/tmp" });
@@ -45,9 +45,34 @@ test("extension hooks emit spans through full lifecycle without errors", async (
   await pi.emit("tool_execution_end", { toolCallId: "c1", toolName: "bash" }, {});
   await pi.emit("turn_end", { turnIndex: 0 }, {});
   await pi.emit("agent_end", {}, {});
-  await pi.emit("session_shutdown", {}, {});
 
-  assert.ok(true);
+  const spans = (context!.exporter as InMemorySpanExporter).getFinishedSpans();
+  assert.equal(spans.length, 4); // tool:bash, gen_ai.chat, turn_0, agent_run
+  const toolSpan = spans.find((s) => s.name === "tool:bash");
+  const chatSpan = spans.find((s) => s.name === "gen_ai.chat");
+  const turnSpan = spans.find((s) => s.name === "turn_0");
+  const agentSpan = spans.find((s) => s.name === "agent_run");
+
+  assert.ok(toolSpan);
+  assert.ok(chatSpan);
+  assert.ok(turnSpan);
+  assert.ok(agentSpan);
+
+  // Hierarchy assertions
+  assert.equal(toolSpan.parentSpanId, turnSpan.spanContext().spanId);
+  assert.equal(chatSpan.parentSpanId, turnSpan.spanContext().spanId);
+  assert.equal(turnSpan.parentSpanId, agentSpan.spanContext().spanId);
+
+  // Attributes assertions
+  assert.equal(toolSpan.attributes[TOOL_ATTRS.NAME], "bash");
+  assert.equal(toolSpan.attributes[TOOL_ATTRS.IS_ERROR], false);
+  assert.equal(chatSpan.attributes[GENAI_ATTRS.REQUEST_MODEL], "claude-3-7-sonnet");
+  assert.equal(chatSpan.attributes[GENAI_ATTRS.USAGE_INPUT_TOKENS], 100);
+  assert.equal(chatSpan.attributes[GENAI_ATTRS.USAGE_OUTPUT_TOKENS], 20);
+  assert.equal(agentSpan.attributes[AGENT_ATTRS.SESSION_ID], "s1");
+  assert.equal(agentSpan.attributes[AGENT_ATTRS.SESSION_CWD], "/tmp");
+
+  await pi.emit("session_shutdown", {}, {});
 });
 
 test("extension respects disabled configuration and registers no hooks", () => {
@@ -60,7 +85,7 @@ test("extension respects disabled configuration and registers no hooks", () => {
 test("extension captures tool arguments when captureContent is true", async () => {
   const pi = new MockExtensionAPI();
 
-  extensionFactory(pi as any, {
+  const context = extensionFactory(pi as any, {
     exporter: "memory",
     captureContent: true,
   });
@@ -82,7 +107,35 @@ test("extension captures tool arguments when captureContent is true", async () =
   await pi.emit("turn_end");
   await pi.emit("agent_end");
 
-  assert.ok(true);
+  const spans = (context!.exporter as InMemorySpanExporter).getFinishedSpans();
+  const failedToolSpan = spans.find((s) => s.name === "tool:read");
+  assert.ok(failedToolSpan);
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.NAME], "read");
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.CALL_ID], "c2");
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.IS_ERROR], true);
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.INPUT_JSON], JSON.stringify({ path: "package.json" }));
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.OUTPUT_BYTES], Buffer.byteLength("File not found", "utf8"));
+  assert.equal(failedToolSpan.status.code, 2); // SpanStatusCode.ERROR
+});
+
+test("extension caches session metadata from session_start and avoids duplicate root spans on agent_start", async () => {
+  const pi = new MockExtensionAPI();
+  const context = extensionFactory(pi as any, { exporter: "memory" });
+
+  // session_start provides sessionId and cwd
+  await pi.emit("session_start", { reason: "startup" }, { sessionId: "session-persistent", cwd: "/workspace" });
+
+  // agent_start without metadata uses cached sessionId and cwd without creating another root span
+  await pi.emit("agent_start", {}, {});
+  await pi.emit("turn_start", { turnIndex: 0 });
+  await pi.emit("turn_end");
+  await pi.emit("agent_end");
+
+  const spans = (context!.exporter as InMemorySpanExporter).getFinishedSpans();
+  const agentSpans = spans.filter((s) => s.name === "agent_run");
+  assert.equal(agentSpans.length, 1);
+  assert.equal(agentSpans[0].attributes[AGENT_ATTRS.SESSION_ID], "session-persistent");
+  assert.equal(agentSpans[0].attributes[AGENT_ATTRS.SESSION_CWD], "/workspace");
 });
 
 test("extension handles errors inside hooks gracefully without throwing", async () => {

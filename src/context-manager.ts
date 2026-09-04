@@ -14,7 +14,9 @@ export class TraceContextManager {
 
   startAgentRun(sessionId?: string, cwd?: string): Span {
     if (this.agentSpan) {
-      this.agentSpan.end();
+      if (sessionId) this.agentSpan.setAttribute(AGENT_ATTRS.SESSION_ID, sessionId);
+      if (cwd) this.agentSpan.setAttribute(AGENT_ATTRS.SESSION_CWD, cwd);
+      return this.agentSpan;
     }
     const span = this.tracer.startSpan("agent_run", {
       attributes: {
@@ -24,6 +26,10 @@ export class TraceContextManager {
     });
     this.agentSpan = span;
     return span;
+  }
+
+  hasActiveAgentRun(): boolean {
+    return this.agentSpan !== null;
   }
 
   endAgentRun(): void {
@@ -124,6 +130,7 @@ export class TraceContextManager {
         attributes: {
           [TOOL_ATTRS.NAME]: toolName,
           [TOOL_ATTRS.CALL_ID]: callId,
+          [TOOL_ATTRS.IS_ERROR]: false,
           ...(inputArgs ? { [TOOL_ATTRS.INPUT_JSON]: JSON.stringify(inputArgs) } : {}),
         },
       },
@@ -146,15 +153,17 @@ export class TraceContextManager {
     }
   }
 
-  endToolExecution(callId: string, isError = false): void {
+  endToolExecution(callId: string, isError?: boolean): void {
     const entry = this.toolSpans.get(callId);
     if (!entry) return;
 
     const duration = Date.now() - entry.startTime;
     entry.span.setAttribute(TOOL_ATTRS.DURATION_MS, duration);
-    entry.span.setAttribute(TOOL_ATTRS.IS_ERROR, isError);
-    if (isError) {
-      entry.span.setStatus({ code: SpanStatusCode.ERROR });
+    if (isError !== undefined) {
+      entry.span.setAttribute(TOOL_ATTRS.IS_ERROR, isError);
+      if (isError) {
+        entry.span.setStatus({ code: SpanStatusCode.ERROR });
+      }
     }
     entry.span.end();
     this.toolSpans.delete(callId);
