@@ -13,6 +13,9 @@ export class TraceContextManager {
   }
 
   startAgentRun(sessionId?: string, cwd?: string): Span {
+    if (this.agentSpan) {
+      this.agentSpan.end();
+    }
     const span = this.tracer.startSpan("agent_run", {
       attributes: {
         [AGENT_ATTRS.SESSION_ID]: sessionId ?? "unknown",
@@ -24,6 +27,18 @@ export class TraceContextManager {
   }
 
   endAgentRun(): void {
+    if (this.chatSpan) {
+      this.chatSpan.end();
+      this.chatSpan = null;
+    }
+    if (this.turnSpan) {
+      this.turnSpan.end();
+      this.turnSpan = null;
+    }
+    for (const [, entry] of this.toolSpans) {
+      entry.span.end();
+    }
+    this.toolSpans.clear();
     if (this.agentSpan) {
       this.agentSpan.end();
       this.agentSpan = null;
@@ -31,6 +46,9 @@ export class TraceContextManager {
   }
 
   startTurn(turnIndex: number): Span {
+    if (this.turnSpan) {
+      this.turnSpan.end();
+    }
     const parentContext = this.agentSpan
       ? trace.setSpan(context.active(), this.agentSpan)
       : context.active();
@@ -49,6 +67,10 @@ export class TraceContextManager {
   }
 
   endTurn(): void {
+    if (this.chatSpan) {
+      this.chatSpan.end();
+      this.chatSpan = null;
+    }
     if (this.turnSpan) {
       this.turnSpan.end();
       this.turnSpan = null;
@@ -56,6 +78,9 @@ export class TraceContextManager {
   }
 
   startChat(model?: string, system?: string): Span {
+    if (this.chatSpan) {
+      this.chatSpan.end();
+    }
     const parentContext = this.turnSpan
       ? trace.setSpan(context.active(), this.turnSpan)
       : context.active();
