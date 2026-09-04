@@ -124,6 +124,15 @@ export class TraceContextManager {
       ? trace.setSpan(context.active(), this.turnSpan)
       : context.active();
 
+    let inputJson: string | undefined;
+    if (inputArgs) {
+      try {
+        inputJson = JSON.stringify(inputArgs);
+      } catch {
+        inputJson = "[Unserializable input]";
+      }
+    }
+
     const span = this.tracer.startSpan(
       `tool:${toolName}`,
       {
@@ -131,7 +140,7 @@ export class TraceContextManager {
           [TOOL_ATTRS.NAME]: toolName,
           [TOOL_ATTRS.CALL_ID]: callId,
           [TOOL_ATTRS.IS_ERROR]: false,
-          ...(inputArgs ? { [TOOL_ATTRS.INPUT_JSON]: JSON.stringify(inputArgs) } : {}),
+          ...(inputJson !== undefined ? { [TOOL_ATTRS.INPUT_JSON]: inputJson } : {}),
         },
       },
       parentContext

@@ -90,3 +90,24 @@ test("TraceContextManager records tool result errors and output byte size", asyn
   assert.equal(toolSpan.attributes[TOOL_ATTRS.INPUT_JSON], JSON.stringify({ path: "missing.txt" }));
   assert.equal(toolSpan.status.code, 2); // SpanStatusCode.ERROR === 2
 });
+
+test("TraceContextManager handles circular/unserializable tool input args gracefully", async () => {
+  const { tracer, exporter, forceFlush, shutdown } = initTracer({ exporter: "memory" });
+  const cm = new TraceContextManager(tracer);
+
+  const circular: any = {};
+  circular.self = circular;
+
+  cm.startTurn(0);
+  cm.startToolExecution("call-circ", "custom", circular);
+  cm.endToolExecution("call-circ", false);
+  cm.endTurn();
+
+  await forceFlush();
+  const spans = (exporter as InMemorySpanExporter).getFinishedSpans();
+  await shutdown();
+
+  const toolSpan = spans.find((s) => s.name === "tool:custom");
+  assert.ok(toolSpan);
+  assert.equal(toolSpan.attributes[TOOL_ATTRS.INPUT_JSON], "[Unserializable input]");
+});

@@ -16,6 +16,10 @@ export class FileSpanExporter implements SpanExporter {
   }
 
   export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
+    if (spans.length === 0) {
+      resultCallback({ code: ExportResultCode.SUCCESS });
+      return;
+    }
     try {
       const lines = spans.map((span) =>
         JSON.stringify({

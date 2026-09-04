@@ -97,3 +97,20 @@ test("FileSpanExporter writes spans to file in JSON lines format", async (t) => 
   assert.equal(parsed.traceId, "t123");
   assert.equal(parsed.name, "test-span");
 });
+
+test("FileSpanExporter handles empty spans array as immediate success", async () => {
+  const exporter = new FileSpanExporter({
+    disabled: false,
+    exporter: "file",
+    endpoint: "",
+    serviceName: "pi-test",
+    filePath: ".pi/test-empty-spans.jsonl",
+    captureContent: false,
+  });
+
+  const res = await new Promise<{ code: number }>((resolve) => {
+    exporter.export([], (result) => resolve(result));
+  });
+
+  assert.equal(res.code, 0); // ExportResultCode.SUCCESS === 0
+});
