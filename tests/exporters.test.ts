@@ -74,6 +74,7 @@ test("FileSpanExporter writes spans to file in JSON lines format", async (t) => 
 
   const dummySpan: any = {
     spanContext: () => ({ traceId: "t123", spanId: "s456" }),
+    parentSpanId: "p000",
     name: "test-span",
     kind: 0,
     startTime: [1000, 0],
@@ -95,6 +96,8 @@ test("FileSpanExporter writes spans to file in JSON lines format", async (t) => 
   const content = fs.readFileSync(tempPath, "utf8");
   const parsed = JSON.parse(content.trim());
   assert.equal(parsed.traceId, "t123");
+  assert.equal(parsed.spanId, "s456");
+  assert.equal(parsed.parentSpanId, "p000");
   assert.equal(parsed.name, "test-span");
 });
 

@@ -25,6 +25,7 @@ export class FileSpanExporter implements SpanExporter {
         JSON.stringify({
           traceId: span.spanContext().traceId,
           spanId: span.spanContext().spanId,
+          parentSpanId: span.parentSpanId,
           name: span.name,
           kind: span.kind,
           startTime: span.startTime,

@@ -12,6 +12,24 @@ test("resolveConfig resolves default environment values", () => {
   assert.equal(config.captureContent, false);
 });
 
+test("resolveConfig respects OTEL_EXPORTER_OTLP_TRACES_ENDPOINT precedence over OTEL_EXPORTER_OTLP_ENDPOINT", () => {
+  const origTraces = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
+  const origBase = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  try {
+    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "http://traces.custom/v1/traces";
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://base.custom/v1/traces";
+
+    const config = resolveConfig();
+    assert.equal(config.endpoint, "http://traces.custom/v1/traces");
+  } finally {
+    if (origTraces !== undefined) process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = origTraces;
+    else delete process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
+
+    if (origBase !== undefined) process.env.OTEL_EXPORTER_OTLP_ENDPOINT = origBase;
+    else delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  }
+});
+
 test("resolveConfig respects custom overrides", () => {
   const config = resolveConfig({
     serviceName: "custom-agent",

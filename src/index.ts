@@ -22,7 +22,6 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
     try {
       if (ctx?.sessionId) currentSessionId = ctx.sessionId;
       if (ctx?.cwd) currentCwd = ctx.cwd;
-      cm.startAgentRun(currentSessionId, currentCwd);
     } catch (err) {
       console.warn("[pi-otel] Error in session_start:", err);
     }
@@ -49,7 +48,8 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
   pi.on("before_provider_request", async (event) => {
     try {
       const model = event?.payload?.model;
-      cm.startChat(model);
+      const provider = event?.provider ?? event?.payload?.provider;
+      cm.startChat(model, provider);
     } catch (err) {
       console.warn("[pi-otel] Error in before_provider_request:", err);
     }
@@ -82,10 +82,18 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
 
   pi.on("tool_result", async (event) => {
     try {
-      const content = Array.isArray(event?.content)
-        ? event.content.map((c: any) => c.text ?? "").join("")
-        : "";
-      const outputBytes = content ? Buffer.byteLength(content, "utf8") : undefined;
+      let outputBytes: number | undefined;
+      if (config.captureContent) {
+        let contentStr = "";
+        if (typeof event?.content === "string") {
+          contentStr = event.content;
+        } else if (Array.isArray(event?.content)) {
+          contentStr = event.content
+            .map((c: any) => c?.text ?? (typeof c === "string" ? c : ""))
+            .join("");
+        }
+        outputBytes = Buffer.byteLength(contentStr, "utf8");
+      }
       cm.recordToolResult(event?.toolCallId, Boolean(event?.isError), outputBytes);
     } catch (err) {
       console.warn("[pi-otel] Error in tool_result:", err);

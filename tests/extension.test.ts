@@ -29,7 +29,7 @@ test("extension hooks emit spans through full lifecycle without errors", async (
   await pi.emit("session_start", { reason: "startup" }, { sessionId: "s1", cwd: "/tmp" });
   await pi.emit("agent_start", {}, { sessionId: "s1", cwd: "/tmp" });
   await pi.emit("turn_start", { turnIndex: 0 }, {});
-  await pi.emit("before_provider_request", { payload: { model: "claude-3-7-sonnet" } }, {});
+  await pi.emit("before_provider_request", { provider: "anthropic", payload: { model: "claude-3-7-sonnet" } }, {});
   await pi.emit(
     "message_end",
     {
@@ -67,6 +67,7 @@ test("extension hooks emit spans through full lifecycle without errors", async (
   assert.equal(toolSpan.attributes[TOOL_ATTRS.NAME], "bash");
   assert.equal(toolSpan.attributes[TOOL_ATTRS.IS_ERROR], false);
   assert.equal(chatSpan.attributes[GENAI_ATTRS.REQUEST_MODEL], "claude-3-7-sonnet");
+  assert.equal(chatSpan.attributes[GENAI_ATTRS.SYSTEM], "anthropic");
   assert.equal(chatSpan.attributes[GENAI_ATTRS.USAGE_INPUT_TOKENS], 100);
   assert.equal(chatSpan.attributes[GENAI_ATTRS.USAGE_OUTPUT_TOKENS], 20);
   assert.equal(agentSpan.attributes[AGENT_ATTRS.SESSION_ID], "s1");
@@ -101,7 +102,7 @@ test("extension captures tool arguments when captureContent is true", async () =
   await pi.emit("tool_result", {
     toolCallId: "c2",
     isError: true,
-    content: [{ type: "text", text: "File not found" }],
+    content: "File not found as string",
   });
   await pi.emit("tool_execution_end", { toolCallId: "c2" });
   await pi.emit("turn_end");
@@ -114,7 +115,7 @@ test("extension captures tool arguments when captureContent is true", async () =
   assert.equal(failedToolSpan.attributes[TOOL_ATTRS.CALL_ID], "c2");
   assert.equal(failedToolSpan.attributes[TOOL_ATTRS.IS_ERROR], true);
   assert.equal(failedToolSpan.attributes[TOOL_ATTRS.INPUT_JSON], JSON.stringify({ path: "package.json" }));
-  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.OUTPUT_BYTES], Buffer.byteLength("File not found", "utf8"));
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.OUTPUT_BYTES], Buffer.byteLength("File not found as string", "utf8"));
   assert.equal(failedToolSpan.status.code, 2); // SpanStatusCode.ERROR
 });
 
@@ -122,11 +123,13 @@ test("extension caches session metadata from session_start and avoids duplicate 
   const pi = new MockExtensionAPI();
   const context = extensionFactory(pi as any, { exporter: "memory" });
 
-  // session_start provides sessionId and cwd
+  // session_start provides sessionId and cwd but does not create an active agent span yet
   await pi.emit("session_start", { reason: "startup" }, { sessionId: "session-persistent", cwd: "/workspace" });
+  assert.equal(context!.contextManager.hasActiveAgentRun(), false);
 
   // agent_start without metadata uses cached sessionId and cwd without creating another root span
   await pi.emit("agent_start", {}, {});
+  assert.equal(context!.contextManager.hasActiveAgentRun(), true);
   await pi.emit("turn_start", { turnIndex: 0 });
   await pi.emit("turn_end");
   await pi.emit("agent_end");
