@@ -37,7 +37,7 @@ export function initTracer(overrides?: Partial<PiOtelConfig>) {
   provider.addSpanProcessor(processor);
   provider.register();
 
-  const tracer: Tracer = trace.getTracer("pi-otel", "0.1.0");
+  const tracer: Tracer = provider.getTracer("pi-otel", "0.1.0");
 
   const forceFlush = async (timeoutMs = 1000): Promise<void> => {
     try {
