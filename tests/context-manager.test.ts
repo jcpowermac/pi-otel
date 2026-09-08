@@ -28,8 +28,8 @@ test("TraceContextManager parents tool spans under active turn span", async () =
   assert.ok(toolSpan);
   assert.ok(turnSpan);
   assert.ok(agentSpan);
-  assert.equal(toolSpan.parentSpanId, turnSpan.spanContext().spanId);
-  assert.equal(turnSpan.parentSpanId, agentSpan.spanContext().spanId);
+  assert.equal(toolSpan.parentSpanContext?.spanId, turnSpan.spanContext().spanId);
+  assert.equal(turnSpan.parentSpanContext?.spanId, agentSpan.spanContext().spanId);
 });
 
 test("TraceContextManager records chat span with GenAI usage attributes", async () => {
@@ -57,7 +57,7 @@ test("TraceContextManager records chat span with GenAI usage attributes", async 
 
   assert.ok(chatSpan);
   assert.ok(turnSpan);
-  assert.equal(chatSpan.parentSpanId, turnSpan.spanContext().spanId);
+  assert.equal(chatSpan.parentSpanContext?.spanId, turnSpan.spanContext().spanId);
   assert.equal(chatSpan.attributes[GENAI_ATTRS.REQUEST_MODEL], "claude-3-7-sonnet");
   assert.equal(chatSpan.attributes[GENAI_ATTRS.SYSTEM], "anthropic");
   assert.equal(chatSpan.attributes[GENAI_ATTRS.USAGE_INPUT_TOKENS], 1200);

@@ -74,7 +74,7 @@ test("FileSpanExporter writes spans to file in JSON lines format", async (t) => 
 
   const dummySpan: any = {
     spanContext: () => ({ traceId: "t123", spanId: "s456" }),
-    parentSpanId: "p000",
+    parentSpanContext: { spanId: "p000" },
     name: "test-span",
     kind: 0,
     startTime: [1000, 0],

@@ -1,7 +1,7 @@
 import { trace, type Tracer } from "@opentelemetry/api";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { BatchSpanProcessor, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Resource } from "@opentelemetry/resources";
+import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import type { PiOtelConfig, ExporterKind } from "./types.js";
 import { createSpanExporter } from "./exporters/index.js";
@@ -24,12 +24,6 @@ export function resolveConfig(overrides?: Partial<PiOtelConfig>): PiOtelConfig {
 
 export function initTracer(overrides?: Partial<PiOtelConfig>) {
   const config = resolveConfig(overrides);
-  const provider = new NodeTracerProvider({
-    resource: new Resource({
-      [ATTR_SERVICE_NAME]: config.serviceName,
-    }),
-  });
-
   const exporter = createSpanExporter(config);
   const processor = config.exporter === "memory"
     ? new SimpleSpanProcessor(exporter)
@@ -38,8 +32,14 @@ export function initTracer(overrides?: Partial<PiOtelConfig>) {
         scheduledDelayMillis: 500,
       });
 
-  provider.addSpanProcessor(processor);
-  provider.register();
+  const provider = new NodeTracerProvider({
+    resource: resourceFromAttributes({
+      [ATTR_SERVICE_NAME]: config.serviceName,
+    }),
+    spanProcessors: [processor],
+  });
+
+    provider.register();
 
   const tracer: Tracer = provider.getTracer("pi-otel", "0.1.0");
 

@@ -59,9 +59,9 @@ test("extension hooks emit spans through full lifecycle without errors", async (
   assert.ok(agentSpan);
 
   // Hierarchy assertions
-  assert.equal(toolSpan.parentSpanId, turnSpan.spanContext().spanId);
-  assert.equal(chatSpan.parentSpanId, turnSpan.spanContext().spanId);
-  assert.equal(turnSpan.parentSpanId, agentSpan.spanContext().spanId);
+  assert.equal(toolSpan.parentSpanContext?.spanId, turnSpan.spanContext().spanId);
+  assert.equal(chatSpan.parentSpanContext?.spanId, turnSpan.spanContext().spanId);
+  assert.equal(turnSpan.parentSpanContext?.spanId, agentSpan.spanContext().spanId);
 
   // Attributes assertions
   assert.equal(toolSpan.attributes[TOOL_ATTRS.NAME], "bash");
