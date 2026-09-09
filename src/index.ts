@@ -20,9 +20,13 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
   let currentSessionId: string | undefined;
   let currentCwd: string | undefined;
 
+  const readSessionId = (ctx: any): string | undefined =>
+    ctx?.sessionManager?.getSessionId?.() ?? ctx?.sessionId;
+
   pi.on("session_start", async (_event, ctx) => {
     try {
-      if (ctx?.sessionId) currentSessionId = ctx.sessionId;
+      const id = readSessionId(ctx);
+      if (id) currentSessionId = id;
       if (ctx?.cwd) currentCwd = ctx.cwd;
     } catch (err) {
       console.warn("[pi-otel] Error in session_start:", err);
@@ -31,7 +35,8 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
 
   pi.on("agent_start", async (_event, ctx) => {
     try {
-      if (ctx?.sessionId) currentSessionId = ctx.sessionId;
+      const id = readSessionId(ctx);
+      if (id) currentSessionId = id;
       if (ctx?.cwd) currentCwd = ctx.cwd;
       // Default file path is per-session so concurrent sessions don't interleave;
       // an explicit PI_OTEL_FILE_PATH/override keeps a single shared file.

@@ -170,21 +170,29 @@ test("default file exporter uses per-session path; explicit path stays shared", 
   const originalCwd = process.cwd();
   process.chdir(dir);
   try {
+    // Use the real ExtensionContext shape: sessionId lives on ctx.sessionManager,
+    // not directly on ctx.
+    const ctx = { cwd: dir, sessionManager: { getSessionId: () => "abcdef1234567890" } };
     const pi = new MockExtensionAPI();
     extensionFactory(pi as any, { exporter: "file" });
-    await pi.emit("session_start", {}, { sessionId: "abcdef1234567890", cwd: dir });
-    await pi.emit("agent_start", {}, { sessionId: "abcdef1234567890", cwd: dir });
+    await pi.emit("session_start", {}, ctx);
+    await pi.emit("agent_start", {}, ctx);
     assert.ok(fs.existsSync(path.join(dir, ".pi")), "per-session default dir created at agent_start");
     await pi.emit("turn_end", {}, {});
     await pi.emit("agent_end", null, null);
     await pi.emit("session_shutdown", null, null);
-    assert.ok(fs.existsSync(path.join(dir, ".pi", "traces-abcdef12.jsonl")), "per-session default file created");
+    const file = path.join(dir, ".pi", "traces-abcdef12.jsonl");
+    assert.ok(fs.existsSync(file), "per-session default file created");
+    const spans = fs.readFileSync(file, "utf8").trim().split("\n").map(JSON.parse);
+    const agentSpan = spans.find((s) => s.name === "agent_run");
+    assert.equal(agentSpan.attributes["session.id"], "abcdef1234567890");
 
     const explicit = path.join(dir, "shared.jsonl");
     const pi2 = new MockExtensionAPI();
     extensionFactory(pi2 as any, { exporter: "file", filePath: explicit });
-    await pi2.emit("session_start", {}, { sessionId: "ffffffff00001111", cwd: dir });
-    await pi2.emit("agent_start", {}, { sessionId: "ffffffff00001111", cwd: dir });
+    const ctx2 = { cwd: dir, sessionManager: { getSessionId: () => "ffffffff00001111" } };
+    await pi2.emit("session_start", {}, ctx2);
+    await pi2.emit("agent_start", {}, ctx2);
     await pi2.emit("agent_end", null, null);
     await pi2.emit("session_shutdown", null, null);
     assert.ok(fs.existsSync(explicit), "explicit filePath respected");
