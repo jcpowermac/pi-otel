@@ -5,10 +5,14 @@ import { ExportResultCode, type ExportResult } from "@opentelemetry/core";
 import type { PiOtelConfig } from "../types.js";
 
 export class FileSpanExporter implements SpanExporter {
-  private filePath: string;
+  private filePath!: string;
 
   constructor(config: PiOtelConfig) {
-    this.filePath = path.resolve(process.cwd(), config.filePath);
+    this.setFilePath(config.filePath);
+  }
+
+  setFilePath(filePath: string) {
+    this.filePath = path.resolve(process.cwd(), filePath);
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import extensionFactory from "../src/index.js";
 import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { GENAI_ATTRS, TOOL_ATTRS, AGENT_ATTRS } from "../src/conventions.js";
@@ -160,4 +163,33 @@ test("extension handles errors inside hooks gracefully without throwing", async 
   await pi.emit("session_shutdown", null, null);
 
   assert.ok(true);
+});
+
+test("default file exporter uses per-session path; explicit path stays shared", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-otel-"));
+  const originalCwd = process.cwd();
+  process.chdir(dir);
+  try {
+    const pi = new MockExtensionAPI();
+    extensionFactory(pi as any, { exporter: "file" });
+    await pi.emit("session_start", {}, { sessionId: "abcdef1234567890", cwd: dir });
+    await pi.emit("agent_start", {}, { sessionId: "abcdef1234567890", cwd: dir });
+    assert.ok(fs.existsSync(path.join(dir, ".pi")), "per-session default dir created at agent_start");
+    await pi.emit("turn_end", {}, {});
+    await pi.emit("agent_end", null, null);
+    await pi.emit("session_shutdown", null, null);
+    assert.ok(fs.existsSync(path.join(dir, ".pi", "traces-abcdef12.jsonl")), "per-session default file created");
+
+    const explicit = path.join(dir, "shared.jsonl");
+    const pi2 = new MockExtensionAPI();
+    extensionFactory(pi2 as any, { exporter: "file", filePath: explicit });
+    await pi2.emit("session_start", {}, { sessionId: "ffffffff00001111", cwd: dir });
+    await pi2.emit("agent_start", {}, { sessionId: "ffffffff00001111", cwd: dir });
+    await pi2.emit("agent_end", null, null);
+    await pi2.emit("session_shutdown", null, null);
+    assert.ok(fs.existsSync(explicit), "explicit filePath respected");
+  } finally {
+    process.chdir(originalCwd);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
