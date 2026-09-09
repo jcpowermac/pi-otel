@@ -149,13 +149,16 @@ export class TraceContextManager {
     return span;
   }
 
-  recordToolResult(callId: string, isError: boolean, outputBytes?: number): void {
+  recordToolResult(callId: string, isError: boolean, outputBytes?: number, outputText?: string): void {
     const entry = this.toolSpans.get(callId);
     if (!entry) return;
 
     entry.span.setAttribute(TOOL_ATTRS.IS_ERROR, isError);
     if (outputBytes !== undefined) {
       entry.span.setAttribute(TOOL_ATTRS.OUTPUT_BYTES, outputBytes);
+    }
+    if (outputText !== undefined) {
+      entry.span.setAttribute(TOOL_ATTRS.OUTPUT, outputText);
     }
     if (isError) {
       entry.span.setStatus({ code: SpanStatusCode.ERROR });

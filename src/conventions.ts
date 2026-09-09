@@ -17,6 +17,7 @@ export const TOOL_ATTRS = {
   DURATION_MS: "tool.duration_ms",
   INPUT_JSON: "tool.input.json",
   OUTPUT_BYTES: "tool.output.bytes",
+  OUTPUT: "tool.output",
 } as const;
 
 export const AGENT_ATTRS = {

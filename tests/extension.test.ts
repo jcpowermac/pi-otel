@@ -68,6 +68,7 @@ test("extension hooks emit spans through full lifecycle without errors", async (
 
   // Attributes assertions
   assert.equal(toolSpan.attributes[TOOL_ATTRS.NAME], "bash");
+  assert.equal(toolSpan.attributes[TOOL_ATTRS.OUTPUT], undefined); // captureContent off by default
   assert.equal(toolSpan.attributes[TOOL_ATTRS.IS_ERROR], false);
   assert.equal(chatSpan.attributes[GENAI_ATTRS.REQUEST_MODEL], "claude-3-7-sonnet");
   assert.equal(chatSpan.attributes[GENAI_ATTRS.SYSTEM], "anthropic");
@@ -119,6 +120,7 @@ test("extension captures tool arguments when captureContent is true", async () =
   assert.equal(failedToolSpan.attributes[TOOL_ATTRS.IS_ERROR], true);
   assert.equal(failedToolSpan.attributes[TOOL_ATTRS.INPUT_JSON], JSON.stringify({ path: "package.json" }));
   assert.equal(failedToolSpan.attributes[TOOL_ATTRS.OUTPUT_BYTES], Buffer.byteLength("File not found as string", "utf8"));
+  assert.equal(failedToolSpan.attributes[TOOL_ATTRS.OUTPUT], "File not found as string");
   assert.equal(failedToolSpan.status.code, 2); // SpanStatusCode.ERROR
 });
 

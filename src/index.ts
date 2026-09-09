@@ -101,6 +101,7 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
   pi.on("tool_result", async (event) => {
     try {
       let outputBytes: number | undefined;
+      let outputSnippet: string | undefined;
       if (config.captureContent) {
         let contentStr = "";
         if (typeof event?.content === "string") {
@@ -111,8 +112,11 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
             .join("");
         }
         outputBytes = Buffer.byteLength(contentStr, "utf8");
+        // Failure reasons usually sit at the end (stderr tail); success output is read from the front.
+        // ponytail: 2000-char cap; raise or make configurable if longer context is needed.
+        outputSnippet = event?.isError ? contentStr.slice(-2000) : contentStr.slice(0, 2000);
       }
-      cm.recordToolResult(event?.toolCallId, Boolean(event?.isError), outputBytes);
+      cm.recordToolResult(event?.toolCallId, Boolean(event?.isError), outputBytes, outputSnippet);
     } catch (err) {
       console.warn("[pi-otel] Error in tool_result:", err);
     }
