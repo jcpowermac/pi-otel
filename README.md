@@ -79,7 +79,8 @@ Configure `pi-otel` using standard OpenTelemetry and Pi environment variables:
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `PI_OTEL_EXPORTER` | `otlp` | Active exporter: `otlp`, `file`, or `console` |
+| `PI_OTEL_EXPORTER` | `otlp` | Active exporter (legacy single value): `otlp`, `file`, `console` | `memory` |
+| `PI_OTEL_EXPORTERS` | — | Comma-separated list of exporters, one span processor each, e.g. `otlp,file` (wins over `PI_OTEL_EXPORTER`) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP HTTP receiver endpoint |
 | `OTEL_SERVICE_NAME` | `pi-coding-agent` | Service name in exported traces |
 | `PI_OTEL_FILE_PATH` | `.pi/traces.jsonl` | Output file path when using `file` exporter |

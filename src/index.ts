@@ -14,7 +14,7 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
     return;
   }
 
-  const { tracer, provider, exporter, forceFlush, shutdown } = initTracer(config);
+  const { tracer, provider, exporter, exporters, forceFlush, shutdown } = initTracer(config);
   const cm = new TraceContextManager(tracer);
 
   let currentSessionId: string | undefined;
@@ -41,13 +41,16 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
       // Default file path is per-session so concurrent sessions don't interleave;
       // an explicit PI_OTEL_FILE_PATH/override keeps a single shared file.
       if (
-        config.exporter === "file" &&
+        config.exporters.includes("file") &&
         !configOverrides?.filePath &&
         !process.env.PI_OTEL_FILE_PATH &&
-        currentSessionId &&
-        exporter instanceof FileSpanExporter
+        currentSessionId
       ) {
-        exporter.setFilePath(path.join(".pi", `traces-${currentSessionId.slice(0, 8)}.jsonl`));
+        for (const exp of exporters) {
+          if (exp instanceof FileSpanExporter) {
+            exp.setFilePath(path.join(".pi", `traces-${currentSessionId.slice(0, 8)}.jsonl`));
+          }
+        }
       }
       cm.startAgentRun(currentSessionId, currentCwd);
     } catch (err) {
@@ -156,5 +159,5 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
     }
   });
 
-  return { tracer, provider, exporter, forceFlush, shutdown, contextManager: cm };
+  return { tracer, provider, exporter, exporters, forceFlush, shutdown, contextManager: cm };
 }

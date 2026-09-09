@@ -6,6 +6,7 @@ import * as path from "node:path";
 import extensionFactory from "../src/index.js";
 import { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { GENAI_ATTRS, TOOL_ATTRS, AGENT_ATTRS } from "../src/conventions.js";
+import { withCleanEnv } from "./env-utils.js";
 
 class MockExtensionAPI {
   handlers = new Map<string, Function[]>();
@@ -24,7 +25,8 @@ class MockExtensionAPI {
   }
 }
 
-test("extension hooks emit spans through full lifecycle without errors", async () => {
+test("extension hooks emit spans through full lifecycle without errors", async () =>
+  withCleanEnv(async () => {
   const pi = new MockExtensionAPI();
   const context = extensionFactory(pi as any, { exporter: "memory" });
 
@@ -78,7 +80,8 @@ test("extension hooks emit spans through full lifecycle without errors", async (
   assert.equal(agentSpan.attributes[AGENT_ATTRS.SESSION_CWD], "/tmp");
 
   await pi.emit("session_shutdown", {}, {});
-});
+  })
+);
 
 test("extension respects disabled configuration and registers no hooks", () => {
   const pi = new MockExtensionAPI();
@@ -167,7 +170,8 @@ test("extension handles errors inside hooks gracefully without throwing", async 
   assert.ok(true);
 });
 
-test("default file exporter uses per-session path; explicit path stays shared", async (t) => {
+test("default file exporter uses per-session path; explicit path stays shared", async (t) =>
+  withCleanEnv(async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-otel-"));
   const originalCwd = process.cwd();
   process.chdir(dir);
@@ -202,4 +206,5 @@ test("default file exporter uses per-session path; explicit path stays shared", 
     process.chdir(originalCwd);
     fs.rmSync(dir, { recursive: true, force: true });
   }
-});
+  })
+);

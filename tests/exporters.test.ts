@@ -11,6 +11,7 @@ test("creates InMemorySpanExporter when exporter is 'memory'", () => {
   const exporter = createSpanExporter({
     disabled: false,
     exporter: "memory",
+    exporters: ["memory"],
     endpoint: "http://localhost:4318/v1/traces",
     serviceName: "pi-test",
     filePath: ".pi/traces.jsonl",
@@ -23,6 +24,7 @@ test("creates ConsoleSpanExporter when exporter is 'console'", () => {
   const exporter = createSpanExporter({
     disabled: false,
     exporter: "console",
+    exporters: ["console"],
     endpoint: "http://localhost:4318/v1/traces",
     serviceName: "pi-test",
     filePath: ".pi/traces.jsonl",
@@ -35,6 +37,7 @@ test("creates FileSpanExporter when exporter is 'file'", () => {
   const exporter = createSpanExporter({
     disabled: false,
     exporter: "file",
+    exporters: ["file"],
     endpoint: "http://localhost:4318/v1/traces",
     serviceName: "pi-test",
     filePath: ".pi/test-traces.jsonl",
@@ -47,6 +50,7 @@ test("creates OTLPTraceExporter when exporter is 'otlp' or default", () => {
   const exporter = createSpanExporter({
     disabled: false,
     exporter: "otlp",
+    exporters: ["otlp"],
     endpoint: "http://localhost:4318/v1/traces",
     serviceName: "pi-test",
     filePath: ".pi/traces.jsonl",
@@ -66,6 +70,7 @@ test("FileSpanExporter writes spans to file in JSON lines format", async (t) => 
   const exporter = new FileSpanExporter({
     disabled: false,
     exporter: "file",
+    exporters: ["file"],
     endpoint: "",
     serviceName: "pi-test",
     filePath: ".pi/test-run-traces.jsonl",
@@ -105,6 +110,7 @@ test("FileSpanExporter handles empty spans array as immediate success", async ()
   const exporter = new FileSpanExporter({
     disabled: false,
     exporter: "file",
+    exporters: ["file"],
     endpoint: "",
     serviceName: "pi-test",
     filePath: ".pi/test-empty-spans.jsonl",
