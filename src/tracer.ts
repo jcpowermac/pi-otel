@@ -4,7 +4,9 @@ import { BatchSpanProcessor, SimpleSpanProcessor, type SpanProcessor } from "@op
 import type { SpanExporter } from "@opentelemetry/sdk-trace-base";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
+import { configFilePath } from "./config.js";
 import type { PiOtelConfig, ExporterKind } from "./types.js";
+import { readOtelConfig } from "./config.js";
 import { createSpanExporter } from "./exporters/index.js";
 
 const EXPORTER_KINDS: readonly ExporterKind[] = ["otlp", "file", "console", "memory"];
@@ -24,49 +26,41 @@ function parseExporterList(raw: string): ExporterKind[] {
 }
 
 export function resolveConfig(overrides?: Partial<PiOtelConfig>): PiOtelConfig {
-  const env = process.env;
-  // PI_OTEL_EXPORTERS (comma list) wins over legacy single-value PI_OTEL_EXPORTER.
+  const file = readOtelConfig() ?? {};
   const rawExporters =
     overrides?.exporters?.join(",") ??
     overrides?.exporter ??
-    env.PI_OTEL_EXPORTERS ??
-    env.PI_OTEL_EXPORTER ??
+    (Array.isArray(file.exporters) ? file.exporters.join(",") : file.exporters ?? file.exporter) ??
     "otlp";
   const exporters = parseExporterList(rawExporters);
-  // OTEL_EXPORTER_OTLP_ENDPOINT is a base URL per spec, but many users set
-  // the full traces path — accept both.
+  // Base URLs are common in configs — accept both a collector base and a
+  // full traces path.
   // ponytail: endsWith heuristic; strict spec behavior would always append.
-  const baseEndpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  const endpointDefault = baseEndpoint
-    ? baseEndpoint.endsWith("/v1/traces")
-      ? baseEndpoint
-      : `${baseEndpoint.replace(/\/+$/, "")}/v1/traces`
+  const rawEndpoint = overrides?.endpoint ?? file.endpoint;
+  const endpoint = rawEndpoint
+    ? rawEndpoint.endsWith("/v1/traces")
+      ? rawEndpoint
+      : `${rawEndpoint.replace(/\/+$/, "")}/v1/traces`
     : "http://localhost:4318/v1/traces";
   return {
-    disabled: overrides?.disabled ?? (env.PI_OTEL_DISABLED === "true" || env.PI_OTEL_DISABLED === "1"),
+    disabled: overrides?.disabled ?? file.disabled ?? false,
     exporter: exporters[0],
     exporters,
-    endpoint:
-      overrides?.endpoint ??
-      env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??
-      endpointDefault,
-    serviceName: overrides?.serviceName ?? env.OTEL_SERVICE_NAME ?? "pi-coding-agent",
-    filePath: overrides?.filePath ?? env.PI_OTEL_FILE_PATH ?? ".pi/traces.jsonl",
-    captureContent: overrides?.captureContent ?? (env.PI_OTEL_CAPTURE_CONTENT === "true" || env.PI_OTEL_CAPTURE_CONTENT === "1"),
+    endpoint,
+    headers: overrides?.headers ?? file.headers,
+    serviceName: overrides?.serviceName ?? file.serviceName ?? "pi-coding-agent",
+    filePath: overrides?.filePath ?? file.filePath ?? ".pi/traces.jsonl",
+    captureContent: overrides?.captureContent ?? file.captureContent ?? false,
   };
 }
 
 export function initTracer(overrides?: Partial<PiOtelConfig>) {
   const config = resolveConfig(overrides);
-  if (
-    config.exporters.includes("otlp") &&
-    !process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT &&
-    !process.env.OTEL_EXPORTER_OTLP_ENDPOINT
-  ) {
+  if (config.exporters.includes("otlp") && config.endpoint === "http://localhost:4318/v1/traces") {
     console.warn(
       `[pi-otel] No OTLP endpoint configured; defaulting to ${config.endpoint}. ` +
-        `Set PI_OTEL_EXPORTERS=${[...config.exporters].filter((k) => k !== "otlp").join(",") || "file"} to also write locally, ` +
-        "or point OTEL_EXPORTER_OTLP_ENDPOINT at a collector."
+        `Set otel.exporters in ${configFilePath()} to also write locally, ` +
+        "or set otel.endpoint to your collector."
     );
   }
   // One span processor per configured exporter. OTel 2.x removed the

@@ -7,6 +7,8 @@ export interface PiOtelConfig {
   /** One span processor per entry. */
   exporters: ExporterKind[];
   endpoint: string;
+  /** OTLP request headers (e.g. { "Authorization": "Bearer ..." }). */
+  headers?: Record<string, string>;
   serviceName: string;
   filePath: string;
   captureContent: boolean;

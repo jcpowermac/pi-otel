@@ -75,31 +75,38 @@ pi -e ~/Development/pi-otel
 
 ## Configuration
 
-Configure `pi-otel` using standard OpenTelemetry and Pi environment variables:
+Configure `pi-otel` in `~/.pi/agent/pi-learner.json` (the `otel` section; the
+file is shared with `pi-learner`, whose settings live in the `learner` section).
+The config directory follows `PI_CODING_AGENT_DIR` when set.
 
-| Variable | Default | Description |
+| Key (`otel.*`) | Default | Description |
 | :--- | :--- | :--- |
-| `PI_OTEL_EXPORTER` | `otlp` | Active exporter (legacy single value): `otlp`, `file`, `console` | `memory` |
-| `PI_OTEL_EXPORTERS` | — | Comma-separated list of exporters, one span processor each, e.g. `otlp,file` (wins over `PI_OTEL_EXPORTER`) |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP HTTP receiver endpoint |
-| `OTEL_SERVICE_NAME` | `pi-coding-agent` | Service name in exported traces |
-| `PI_OTEL_FILE_PATH` | `.pi/traces.jsonl` | Output file path when using `file` exporter |
-| `PI_OTEL_DISABLED` | `false` | Set to `true` or `1` to disable telemetry |
-| `PI_OTEL_CAPTURE_CONTENT` | `false` | Set to `true` to capture tool parameters and output sizes |
+| `disabled` | `false` | Set to `true` to disable telemetry |
+| `exporters` | `["otlp"]` | List of exporters, one span processor each: `otlp`, `file`, `console`, `memory` (a comma-separated string is also accepted) |
+| `endpoint` | `http://localhost:4318/v1/traces` | OTLP HTTP receiver endpoint (a collector base URL is also accepted) |
+| `headers` | — | OTLP request headers, e.g. `{ "Authorization": "Basic <base64-keys>" }` |
+| `serviceName` | `pi-coding-agent` | Service name in exported traces |
+| `filePath` | `.pi/traces.jsonl` (per-session `traces-<id>.jsonl` when unset) | Output file path when using the `file` exporter |
+| `captureContent` | `false` | Set to `true` to capture tool parameters and output sizes |
 
 ---
 
 ## Quickstart Examples
 
 ### 1. Local File Export (No Collector Required)
-Export traces directly to `.pi/traces.jsonl`:
+
+```json
+{ "otel": { "exporters": ["file"] } }
+```
+
+Write to `~/.pi/agent/pi-learner.json`, then run Pi:
 
 ```bash
-export PI_OTEL_EXPORTER=file
-export PI_OTEL_FILE_PATH=.pi/traces.jsonl
-
 pi -e ~/Development/pi-otel "List files in src/ and check tests"
 ```
+
+Traces are written to `.pi/traces-<session>.jsonl` in the current directory
+(one file per session unless `otel.filePath` is set).
 
 ### 2. Export to Jaeger via OTLP
 Run Jaeger with OTLP receiver enabled:
@@ -112,22 +119,24 @@ docker run -d --name jaeger \
   jaegertracing/all-in-one:latest
 ```
 
-Then run Pi:
-```bash
-export PI_OTEL_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+Then configure:
 
-pi -e ~/Development/pi-otel
+```json
+{ "otel": { "exporters": ["otlp"], "endpoint": "http://localhost:4318/v1/traces" } }
 ```
+
 Open `http://localhost:16686` in your browser to view the trace waterfall.
 
 ### 3. Export to Langfuse
-```bash
-export PI_OTEL_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel/v1/traces
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64-keys>"
 
-pi -e ~/Development/pi-otel
+```json
+{
+  "otel": {
+    "exporters": ["otlp"],
+    "endpoint": "https://cloud.langfuse.com/api/public/otel/v1/traces",
+    "headers": { "Authorization": "Basic <base64-keys>" }
+  }
+}
 ```
 
 ---

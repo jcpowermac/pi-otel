@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import { initTracer, resolveConfig } from "./tracer.js";
+import { readOtelConfig } from "./config.js";
 import { TraceContextManager } from "./context-manager.js";
 import { FileSpanExporter } from "./exporters/file.js";
 import type { PiOtelConfig } from "./types.js";
@@ -39,11 +40,11 @@ export default function (pi: ExtensionAPI, configOverrides?: Partial<PiOtelConfi
       if (id) currentSessionId = id;
       if (ctx?.cwd) currentCwd = ctx.cwd;
       // Default file path is per-session so concurrent sessions don't interleave;
-      // an explicit PI_OTEL_FILE_PATH/override keeps a single shared file.
+      // an explicit otel.filePath in config or override keeps a single shared file.
       if (
         config.exporters.includes("file") &&
         !configOverrides?.filePath &&
-        !process.env.PI_OTEL_FILE_PATH &&
+        readOtelConfig()?.filePath === undefined &&
         currentSessionId
       ) {
         for (const exp of exporters) {
